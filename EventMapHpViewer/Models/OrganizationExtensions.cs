@@ -72,6 +72,8 @@ namespace EventMapHpViewer.Models
                     return 6.0;
                 case 22:    // 補給艦
                     return 15.0;
+                case 14:    // 潜水空母
+                    return 1.0;
                 default:
                     return 0;   // その他は0
             }

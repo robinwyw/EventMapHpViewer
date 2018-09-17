@@ -36,7 +36,7 @@ namespace EventMapHpViewer.Models
 
             var proxy = KanColleClient.Current.Proxy;
 
-            proxy.api_start2
+            proxy.api_start2_getData
                 .TryParse<kcsapi_start2>()
                 .Subscribe(x =>
                 {
