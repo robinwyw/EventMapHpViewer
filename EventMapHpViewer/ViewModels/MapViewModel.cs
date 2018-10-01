@@ -3,7 +3,9 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Media;
 using EventMapHpViewer.Models;
+using EventMapHpViewer.Models.Settings;
 using Livet;
+using MetroTrilithon.Mvvm;
 
 namespace EventMapHpViewer.ViewModels
 {
@@ -334,8 +336,7 @@ namespace EventMapHpViewer.ViewModels
             this.AreaName = info.AreaName;
             this.Current = info.Current?.ToString() ?? "???";
             this.Max = info.Max?.ToString() ?? "???";
-            this.SelectedRank = info.Eventmap?.SelectedRankText ?? "";
-            this.RemainingCountTransportS = info.RemainingCountTransportS.ToString();
+            this.SelectedRank = info.Eventmap?.SelectedRank.ToString();
             this.IsCleared = info.IsCleared == 1;
             this.IsRankSelected = info.Eventmap == null
                 || info.Eventmap.SelectedRank != 0
@@ -347,21 +348,16 @@ namespace EventMapHpViewer.ViewModels
             this.IsInfinity = false;
             this.IsLoading = true;
 
-            this.UpdateRemainingCount(info);
-        }
-
-        public void UpdateTransportCapacity()
-        {
-            this.UpdateRemainingCount(this._source, true);
+            this.UpdateRemainingCount();
         }
 
 
-        private void UpdateRemainingCount(MapData info, bool useCache = false)
+        public void UpdateRemainingCount()
         {
             try
             {
-                info.GetRemainingCount(useCache)
-                    .ContinueWith(t => this.Update(t.Result, useCache));
+                this._source.GetRemainingCount()
+                    .ContinueWith(t => this.Update(t.Result));
             }
             catch (AggregateException e)
             {
@@ -369,14 +365,11 @@ namespace EventMapHpViewer.ViewModels
             }
         }
 
-        private void Update(RemainingCount remainingCount, bool useCache)
+        private void Update(RemainingCount remainingCount)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                if (!useCache)
-                {
-                    this.IsLoading = false;
-                }
+                this.IsLoading = false;
                 this.IsSupported = remainingCount != null;
                 if (!this.IsSupported)
                 {
@@ -386,7 +379,7 @@ namespace EventMapHpViewer.ViewModels
 
                 this.RemainingCountMin = remainingCount.Min.ToString();
                 this.RemainingCountMax = remainingCount.Max.ToString();
-                this.RemainingCountTransportS = this._source.RemainingCountTransportS.ToString();
+                this.RemainingCountTransportS = this._source.GetRemainingCountTransportS().ToString();
                 this.IsInfinity = remainingCount == RemainingCount.MaxValue;
                 this.GaugeColor = remainingCount.Min < 2 ? red : green;
             });

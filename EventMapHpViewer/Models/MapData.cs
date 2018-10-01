@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Codeplex.Data;
+using EventMapHpViewer.Models.Settings;
 using Grabacr07.KanColleWrapper;
 using Nekoxy;
 
@@ -12,6 +13,7 @@ namespace EventMapHpViewer.Models
 {
     public class MapData
     {
+        private readonly RemoteSettingsClient client = new RemoteSettingsClient();
         public int Id { get; set; }
         public int IsCleared { get; set; }
         public int IsExBoss { get; set; }
@@ -50,12 +52,10 @@ namespace EventMapHpViewer.Models
             }
         }
 
-        private Raw.map_exboss[] remoteBossDataCache;
-
         /// <summary>
         /// 残回数。輸送の場合はA勝利の残回数。
         /// </summary>
-        public async Task<RemainingCount> GetRemainingCount(bool useCache = false)
+        public async Task<RemainingCount> GetRemainingCount()
         {
             if (this.IsCleared == 1) return RemainingCount.Zero;
 
@@ -67,32 +67,62 @@ namespace EventMapHpViewer.Models
 
             if (this.Eventmap.GaugeType == GaugeType.Transport)
             {
-                var capacityA = KanColleClient.Current.Homeport.Organization.TransportationCapacity();
-                if (capacityA == 0) return RemainingCount.MaxValue;  //ゲージ減らない
-                return new RemainingCount((int)Math.Ceiling((double)this.Current / capacityA));
+                var capacity = KanColleClient.Current.Homeport.Organization.TransportationCapacity();
+                if (capacity.A == 0) return RemainingCount.MaxValue;  //ゲージ減らない
+                return new RemainingCount((int)Math.Ceiling((decimal)this.Current / capacity.A));
             }
 
             if (this.Eventmap.SelectedRank == 0) return null; //難易度未選択
 
-            if (!useCache)
-                this.remoteBossDataCache = await GetEventBossHp(this.Id, this.Eventmap.SelectedRank);
-            
-            if (this.remoteBossDataCache != null && this.remoteBossDataCache.Any())
-                return this.CalculateRemainingCount(this.remoteBossDataCache);   //イベント海域(リモートデータ)
+            if (MapHpSettings.UseLocalBossSettings)
+            {
+                var settings = BossSettingsWrapper.FromSettings.List
+                    .Where(x => x.MapId == this.Id)
+                    .Where(x => x.Rank == (int)this.Eventmap.SelectedRank)
+                    .Where(x => x.GaugeNum == this.Eventmap.GaugeNum)
+                    .ToArray();
+                if (settings.Any())
+                    return this.CalculateRemainingCount(settings);
+            }
+            else
+            {
+                var remoteBossData = await client.GetSettings<Raw.map_exboss[]>(
+                    RemoteSettingsClient.BuildBossSettingsUrl(
+                        MapHpSettings.RemoteBossSettingsUrl,
+                        this.Id,
+                        (int)this.Eventmap.SelectedRank,
+                        this.Eventmap.GaugeNum ?? 0));  // GaugeNum がない場合 0 とみなす(リモート設定は空にしても 0 になるので)
+                client.CloseConnection();
+
+                if (remoteBossData == null)
+                    return null;
+
+                if (!remoteBossData.Any(x => x.last))
+                    return null;
+
+                if(!remoteBossData.Any(x => !x.last))
+                    return null;
+
+                return this.CalculateRemainingCount(BossSettingsWrapper.Parse(remoteBossData));   //イベント海域(リモートデータ)
+            }
 
             return null;  //未対応
         }
 
-        private RemainingCount CalculateRemainingCount(Raw.map_exboss[] data)
+        private RemainingCount CalculateRemainingCount(IEnumerable<BossSetting> settings)
         {
+            var normals = settings.Where(x => !x.IsLast);
+            var lasts = settings.Where(x => x.IsLast);
+            if (!normals.Any() || !lasts.Any())
+                return null;
             return new RemainingCount(
                 CalculateRemainingCount(
-                    data.Where(x => !x.isLast).Max(x => x.ship.maxhp),
-                    data.Where(x => x.isLast).Max(x => x.ship.maxhp)
+                    normals.Max(x => x.BossHP),
+                    lasts.Max(x => x.BossHP)
                 ),
                 CalculateRemainingCount(
-                    data.Where(x => !x.isLast).Min(x => x.ship.maxhp),
-                    data.Where(x => x.isLast).Min(x => x.ship.maxhp)
+                    normals.Min(x => x.BossHP),
+                    lasts.Min(x => x.BossHP)
                 ));
         }
 
@@ -105,92 +135,13 @@ namespace EventMapHpViewer.Models
         /// <summary>
         /// 輸送ゲージのS勝利時の残回数
         /// </summary>
-        public int RemainingCountTransportS
+        public int GetRemainingCountTransportS()
         {
-            get
-            {
-                if (this.Eventmap?.GaugeType != GaugeType.Transport) return -1;
-                var capacity = KanColleClient.Current.Homeport.Organization.TransportationCapacity(true);
-                if (capacity == 0) return int.MaxValue;  //ゲージ減らない
-                return (int)Math.Ceiling((double)this.Current / capacity);
-            }
-        }
+            if (this.Eventmap?.GaugeType != GaugeType.Transport) return -1;
 
-        /// <summary>
-        /// 艦これ戦術データ・リンクからボス情報を取得する。
-        /// 取得できなかった場合は null を返す。
-        /// </summary>
-        /// <param name="mapId"></param>
-        /// <param name="rank"></param>
-        /// <returns></returns>
-        private static async Task<Raw.map_exboss[]> GetEventBossHp(int mapId, int rank)
-        {
-            using (var client = new HttpClient(GetProxyConfiguredHandler()))
-            {
-                client.DefaultRequestHeaders
-                    .TryAddWithoutValidation("User-Agent", $"{MapHpViewer.title}/{MapHpViewer.version}");
-                try {
-                    // rank の後ろの"1"はサーバー上手動メンテデータを加味するかどうかのフラグ
-                    var response = await client.GetAsync($"https://kctadil.azurewebsites.net/map/maphp/v3.2/{mapId}/{rank}");
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        // 200 じゃなかった
-                        return null;
-                    }
-
-                    var json = await response.Content.ReadAsStringAsync();
-                    Raw.map_exboss[] parsed = DynamicJson.Parse(json);
-                    if (parsed == null
-                        || !parsed.Any(x => x.isLast)
-                        || !parsed.Any(x => !x.isLast))
-                    {
-                        // データが揃っていない
-                        return null;
-                    }
-                    return parsed;
-                }
-                catch (HttpRequestException)
-                {
-                    // HTTP リクエストに失敗した
-                    return null;
-                }
-            }
-        }
-
-        /// <summary>
-        /// 本体のプロキシ設定を組み込んだHttpClientHandlerを返す。
-        /// </summary>
-        /// <returns></returns>
-        private static HttpClientHandler GetProxyConfiguredHandler()
-        {
-            switch (HttpProxy.UpstreamProxyConfig.Type)
-            {
-                case ProxyConfigType.DirectAccess:
-                    return new HttpClientHandler
-                    {
-                        UseProxy = false
-                    };
-                case ProxyConfigType.SpecificProxy:
-                    var settings = KanColleClient.Current.Proxy.UpstreamProxySettings;
-                    var host = settings.IsUseHttpProxyForAllProtocols ? settings.HttpHost : settings.HttpsHost;
-                    var port = settings.IsUseHttpProxyForAllProtocols ? settings.HttpPort : settings.HttpsPort;
-                    if (string.IsNullOrWhiteSpace(host))
-                    {
-                        return new HttpClientHandler { UseProxy = false };
-                    }
-                    else
-                    {
-                        return new HttpClientHandler
-                        {
-                            UseProxy = true,
-                            Proxy = new WebProxy($"{host}:{port}"),
-                        };
-                    }
-                case ProxyConfigType.SystemProxy:
-                    return new HttpClientHandler();
-                default:
-                    return new HttpClientHandler();
-            }
+            var capacity = KanColleClient.Current.Homeport.Organization.TransportationCapacity();
+            if (capacity.S == 0) return int.MaxValue;  //ゲージ減らない
+            return (int)Math.Ceiling((decimal)this.Current / capacity.S);
         }
     }
 }

@@ -1,29 +1,12 @@
-namespace EventMapHpViewer.Models
+Ôªønamespace EventMapHpViewer.Models
 {
     public class Eventmap
     {
         public int? NowMapHp { get; set; }
         public int? MaxMapHp { get; set; }
         public int State { get; set; }
-        public int SelectedRank { get; set; }
+        public Rank SelectedRank { get; set; }
         public GaugeType GaugeType { get; set; }
-
-        public string SelectedRankText
-        {
-            get
-            {
-                switch (this.SelectedRank)
-                {
-                    case 1:
-                        return "ï∏";
-                    case 2:
-                        return "â≥";
-                    case 3:
-                        return "çb";
-                    default:
-                        return "";
-                }
-            }
-        }
+        public int? GaugeNum { get; set; }
     }
 }
