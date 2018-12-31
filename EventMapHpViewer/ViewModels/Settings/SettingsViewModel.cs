@@ -33,12 +33,15 @@ namespace EventMapHpViewer.ViewModels.Settings
 
         private void Initialize()
         {
-            this.BossSettings.MapItemsSource
-                = Models.Maps.MapInfos
-                .Where(x => 20 < x.Value.MapAreaId)
-                .Select(x => x.Value)
-                .Select(x => new KeyValuePair<int, string>(x.Id, $"{x.MapAreaId}-{x.IdInEachMapArea} : {x.Name} - {x.OperationName}"))
-                .ToArray();
+            if (Models.Maps.MapInfos != null)
+            {        
+                this.BossSettings.MapItemsSource
+                    = Models.Maps.MapInfos
+                    .Where(x => 20 < x.Value.MapAreaId)
+                    .Select(x => x.Value)
+                    .Select(x => new KeyValuePair<int, string>(x.Id, $"{x.MapAreaId}-{x.IdInEachMapArea} : {x.Name} - {x.OperationName}"))
+                    .ToArray();                
+            }
             this.BossSettings.IsEnabled = true;
 
             this.TpSettings.Settings.UpdateFromMaster();
