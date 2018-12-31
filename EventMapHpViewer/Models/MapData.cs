@@ -16,10 +16,11 @@ namespace EventMapHpViewer.Models
         private readonly RemoteSettingsClient client = new RemoteSettingsClient();
         public int Id { get; set; }
         public int IsCleared { get; set; }
-        //public int IsExBoss { get; set; }
         public int DefeatCount { get; set; }
         public int RequiredDefeatCount { get; set; }
         public Eventmap Eventmap { get; set; }
+        public GaugeType GaugeType { get; set; }
+        public int? GaugeNum { get; set; }
 
         public MapInfo Master => Maps.MapInfos[this.Id];
 
@@ -29,13 +30,11 @@ namespace EventMapHpViewer.Models
 
         public string AreaName => this.Master.MapArea.Name;
 
-        public GaugeType GaugeType => this.Eventmap?.GaugeType ?? GaugeType.Normal;
-
         public int? Max
         {
             get
             {
-                if (this.RequiredDefeatCount > 0) return this.Master.RequiredDefeatCount;
+                if (this.RequiredDefeatCount > 0) return this.RequiredDefeatCount;
                 return this.Eventmap != null
                     ? this.Eventmap.MaxMapHp
                     : 1;
@@ -46,7 +45,7 @@ namespace EventMapHpViewer.Models
         {
             get
             {
-                if (this.RequiredDefeatCount > 0) return this.Master.RequiredDefeatCount - this.DefeatCount;  //ゲージ有り通常海域
+                if (this.RequiredDefeatCount > 0) return this.RequiredDefeatCount - this.DefeatCount;  //ゲージ有り通常海域
                 return this.Eventmap != null
                     ? this.Eventmap.NowMapHp   // イベント海域
                     : 1;    // ゲージ無し通常海域
@@ -66,7 +65,7 @@ namespace EventMapHpViewer.Models
 
             if (this.Eventmap == null) return new RemainingCount(1);    //ゲージ無し通常海域
 
-            if (this.Eventmap.GaugeType == GaugeType.Transport)
+            if (this.GaugeType == GaugeType.Transport)
             {
                 var capacity = KanColleClient.Current.Homeport.Organization.TransportationCapacity();
                 if (capacity.A == 0) return RemainingCount.MaxValue;  //ゲージ減らない
@@ -80,7 +79,7 @@ namespace EventMapHpViewer.Models
                 var settings = BossSettingsWrapper.FromSettings.List
                     .Where(x => x.MapId == this.Id)
                     .Where(x => x.Rank == (int)this.Eventmap.SelectedRank)
-                    .Where(x => x.GaugeNum == this.Eventmap.GaugeNum)
+                    .Where(x => x.GaugeNum == this.GaugeNum)
                     .ToArray();
                 if (settings.Any())
                     return this.CalculateRemainingCount(settings);
@@ -92,7 +91,7 @@ namespace EventMapHpViewer.Models
                         MapHpSettings.RemoteBossSettingsUrl,
                         this.Id,
                         (int)this.Eventmap.SelectedRank,
-                        this.Eventmap.GaugeNum ?? 0));  // GaugeNum がない場合 0 とみなす(リモート設定は空にしても 0 になるので)
+                        this.GaugeNum ?? 0));  // GaugeNum がない場合 0 とみなす(リモート設定は空にしても 0 になるので)
                 client.CloseConnection();
 
                 if (remoteBossData == null)
@@ -138,7 +137,7 @@ namespace EventMapHpViewer.Models
         /// </summary>
         public int GetRemainingCountTransportS()
         {
-            if (this.Eventmap?.GaugeType != GaugeType.Transport) return -1;
+            if (this.GaugeType != GaugeType.Transport) return -1;
 
             var capacity = KanColleClient.Current.Homeport.Organization.TransportationCapacity();
             if (capacity.S == 0) return int.MaxValue;  //ゲージ減らない
