@@ -25,8 +25,8 @@ namespace EventMapHpViewer.Properties {
         
         [global::System.Configuration.ApplicationScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("https://raw.githubusercontent.com/laserdark/KanColleToolsetResources/master/Event" +
-            "MapHPViewer/{mapId}/{rank}/{gaugeNum}.json")]
+        [global::System.Configuration.DefaultSettingValueAttribute("https://cdn.jsdelivr.net/gh/laserdark/KanColleToolsetResources@master/EventMapHPV" +
+            "iewer/{mapId}/{rank}/{gaugeNum}.json")]
         public string RemoteBossSettings {
             get {
                 return ((string)(this["RemoteBossSettings"]));
