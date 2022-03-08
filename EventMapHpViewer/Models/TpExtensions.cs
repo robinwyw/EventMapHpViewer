@@ -46,7 +46,7 @@ namespace EventMapHpViewer.Models
         {
             var ships = org.Combined
                 ? org.CombinedFleet.Fleets.SelectMany(x => x.Ships)
-                : org.Fleets[1].Ships;
+                : org.Fleets[3].Ships.Count() > 6 ? org.Fleets[3].Ships : org.Fleets[1].Ships;
             return ships.PossibleTransport();
         }
 
