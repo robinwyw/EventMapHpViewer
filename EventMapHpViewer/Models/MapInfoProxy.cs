@@ -38,7 +38,7 @@ namespace EventMapHpViewer.Models
             var proxy = KanColleClient.Current.Proxy;
 
             proxy.ApiSessionSource
-                .Where(s => s.Request.PathAndQuery == "/kcsapi/api_start2/getData")
+                .Where(s => new Uri(s.HttpClient.Request.Url).PathAndQuery == "/kcsapi/api_start2/getData")
                 .TryParse<kcsapi_start2>()
                 .Subscribe(x =>
                 {
@@ -48,7 +48,7 @@ namespace EventMapHpViewer.Models
                 .AddTo(this);
 
             proxy.ApiSessionSource
-                .Where(s => s.Request.PathAndQuery == "/kcsapi/api_get_member/mapinfo")
+                .Where(s => new Uri(s.HttpClient.Request.Url).PathAndQuery == "/kcsapi/api_get_member/mapinfo")
                 .TryParse<mapinfo>()
                 .Subscribe(m =>
                 {
@@ -59,7 +59,7 @@ namespace EventMapHpViewer.Models
                 .AddTo(this);
 
             proxy.ApiSessionSource
-                .Where(s => s.Request.PathAndQuery == "/kcsapi/api_req_map/select_eventmap_rank")
+                .Where(s => new Uri(s.HttpClient.Request.Url).PathAndQuery == "/kcsapi/api_req_map/select_eventmap_rank")
                 .TryParse<map_select_eventmap_rank>()
                 .Subscribe(x =>
                 {
@@ -71,7 +71,7 @@ namespace EventMapHpViewer.Models
 
 
             proxy.ApiSessionSource
-                .Where(x => x.Request.PathAndQuery == "/kcsapi/api_req_map/start")
+                .Where(x => new Uri(x.HttpClient.Request.Url).PathAndQuery == "/kcsapi/api_req_map/start")
                 .TryParse<map_start_next>()
                 .Subscribe(x =>
                 {
