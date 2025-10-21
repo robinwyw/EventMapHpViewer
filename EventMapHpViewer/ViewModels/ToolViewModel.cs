@@ -64,7 +64,7 @@ namespace EventMapHpViewer.ViewModels
                 .Subscribe(nameof(Organization.Ships), () => this.handledShips.Clear(), false)
                 .AddTo(this);
             KanColleClient.Current.Proxy.ApiSessionSource
-                .Where(s => s.Request.PathAndQuery == "/kcsapi/api_req_map/next")
+                .Where(s => new Uri(s.HttpClient.Request.Url).PathAndQuery == "/kcsapi/api_req_map/next")
                 .TryParse<map_start_next>()
                 .Subscribe(x =>
                 {
